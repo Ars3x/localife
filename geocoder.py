@@ -5,14 +5,13 @@
 import requests
 from typing import Optional, Tuple, Dict, Any
 
-
 class YandexGeocoder:
     """
     Геокодер на основе API Яндекс.Карт.
     """
 
     # Базовый URL для геокодирования
-    GEOCODE_URL = "https://geocode-maps.yandex.ru/1.x/"
+    GEOCODE_URL = "https://geocode-maps.yandex.ru/v1/"
 
     def __init__(self, api_key: str):
         """
