@@ -4,6 +4,7 @@
 
 import os
 from dotenv import load_dotenv
+import psycopg2
 
 load_dotenv()
 from geocoder import YandexGeocoder
@@ -11,10 +12,11 @@ from geocoder import YandexGeocoder
 # Вставьте ваш реальный API-ключ (получить можно на https://yandex.ru/dev/maps/geocoder/)
 API_KEY = os.getenv("yandex_geo_key")
 DSN = os.getenv("DATABASE_URL")
+conn = psycopg2.connect(DSN)
 
 if __name__ == "__main__":
 
-    with YandexGeocoder(API_KEY, DSN, use_cache=True) as geocoder:
+    with YandexGeocoder(API_KEY, conn=conn, use_cache=True) as geocoder:
         addresses = [
             "Москва, Широкая улица, 1А",
             "Москва, Широкая улица, 1А",  # повтор – возьмётся из кэша
