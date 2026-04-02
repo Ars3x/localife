@@ -22,7 +22,7 @@ class YandexGeocoder:
     def __init__(
         self,
         api_key: str,
-        dsn: str,
+        conn: psycopg2.extensions.connection,
         bbox: Optional[Tuple[float, float, float, float]] = None,
         use_cache: bool = True,
     ):
@@ -49,7 +49,7 @@ class YandexGeocoder:
         self.session.mount("https://", adapter)
 
         # Подключение к PostgreSQL
-        self.conn = psycopg2.connect(dsn)
+        self.conn = conn
         self.conn.autocommit = False  # управляем транзакциями вручную
         self._init_db()
 
