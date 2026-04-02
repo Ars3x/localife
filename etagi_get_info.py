@@ -22,6 +22,12 @@ options.add_argument("--disable-extensions")
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
 
+options.add_argument(
+    "--headless"
+)  # <-- ЭТО ГЛАВНАЯ СТРОКА, которая включает headless-режим[reference:1]
+# Опционально: отключаем GPU, ускоряет работу в headless-режиме
+options.add_argument("--disable-gpu")
+
 service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=options)
 
@@ -149,9 +155,7 @@ def parse_page(html: str) -> List[Dict]:
         if not address:
             address = "Адрес не указан"
 
-        url_offer = (
-            f"https://msk.etagi.com/realty/offer/{ticket_id}/" if ticket_id else ""
-        )
+        url_offer = f"https://msk.etagi.com/realty/{ticket_id}/" if ticket_id else ""
 
         parsed.append(
             {
@@ -159,7 +163,7 @@ def parse_page(html: str) -> List[Dict]:
                 "price": price,
                 "square": square,
                 "rooms": rooms,
-                "studio": studio,
+                "studio": studio,  # является ли студией
                 "floor": floor,
                 "floors_total": floors_total,
                 "building_year": building_year,
