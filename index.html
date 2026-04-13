@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LocaLife — Умный выбор места жительства</title>
+
+    <!-- Подключаем стили Leaflet (карта) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Шрифт и базовая стилизация -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap"
+        rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Полностью скрывает всю панель с копирайтами */
+        .leaflet-control-attribution {
+            display: none !important;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f5f7fb;
+            color: #1e293b;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Шапка */
+        .header {
+            background: white;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            z-index: 10;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: #0f172a;
+        }
+
+        .logo span {
+            background: #10b981;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            font-weight: 500;
+            color: #64748b;
+        }
+
+        /* Основной контейнер: карта + панель */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Контейнер карты */
+        .map-wrapper {
+            flex: 1;
+            position: relative;
+            background: #e2e8f0;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+
+        /* Плавающая подсказка на карте */
+        .map-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(4px);
+            padding: 12px 18px;
+            border-radius: 40px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #334155;
+            z-index: 5;
+            pointer-events: none;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .map-hint i {
+            color: #10b981;
+            margin-right: 6px;
+        }
+
+        /* Правая панель с информацией */
+        .info-panel {
+            width: 360px;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.02);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            border-left: 1px solid #e2e8f0;
+            z-index: 10;
+        }
+
+        .panel-section {
+            padding: 24px 20px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .panel-title {
+            font-weight: 600;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .comfort-score {
+            background: #f8fafc;
+            border-radius: 20px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+
+        .score-value {
+            font-size: 3rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 8px;
+            transition: color 0.2s;
+        }
+
+        .score-label {
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .objects-list {
+            list-style: none;
+            margin-top: 12px;
+        }
+
+        .objects-list li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.9rem;
+        }
+
+        .objects-list li:last-child {
+            border-bottom: none;
+        }
+
+        .obj-icon {
+            width: 28px;
+            height: 28px;
+            background: #eef2ff;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4f46e5;
+        }
+
+        .obj-details {
+            flex: 1;
+        }
+
+        .obj-name {
+            font-weight: 500;
+        }
+
+        .obj-distance {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        .empty-state {
+            color: #94a3b8;
+            text-align: center;
+            padding: 20px 0;
+            font-style: italic;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 12px;
+            font-size: 0.8rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+        }
+
+        .dot-green {
+            background: #10b981;
+        }
+
+        .dot-red {
+            background: #ef4444;
+        }
+
+        .btn {
+            background: #0f172a;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+            text-align: center;
+        }
+
+        .btn:hover {
+            background: #1e293b;
+        }
+
+        .footer-note {
+            padding: 20px;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div class="logo">
+            🌍 LocaLife
+            <span>прототип</span>
+        </div>
+        <div class="nav-links">
+            <div>О проекте</div>
+            <div>Метрики</div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Карта -->
+        <div class="map-wrapper">
+            <div id="map"></div>
+            <div class="map-hint">
+                ⚡ Передвиньте «лупу» (зону доступности) в любое место
+            </div>
+        </div>
+
+        <!-- Правая панель -->
+        <div class="info-panel">
+            <div class="panel-section">
+                <div class="panel-title">
+                    <span>🏠 Индекс комфорта</span>
+                </div>
+                <div class="comfort-score">
+                    <div class="score-value" id="comfortScoreDisplay">—</div>
+                    <div class="score-label">баллов в радиусе 15 мин пешком</div>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="color-dot dot-green"></div>
+                        <span>Комфортно (≥ 25)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="color-dot dot-red"></div>
+                        <span>Низкий комфорт</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-title">
+                    <span>📍 Объекты в зоне</span>
+                </div>
+                <div id="objectsContainer">
+                    <!-- Динамически заполняется JS -->
+                    <div class="empty-state">Переместите лупу, чтобы увидеть инфраструктуру</div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-title">
+                    <span>⚙️ Сценарий</span>
+                </div>
+                <select id="scenarioSelect"
+                    style="width:100%; padding:12px; border-radius:12px; border:1px solid #e2e8f0; font-family:inherit; margin-bottom:12px;">
+                    <option value="family">👨‍👩‍👧 Молодая семья</option>
+                    <option value="senior">🧓 Пенсионер</option>
+                    <option value="it">💻 IT-специалист</option>
+                </select>
+                <button class="btn" id="recalculateBtn">⟳ Пересчитать для выбранного сценария</button>
+                <p style="font-size:0.75rem; color:#64748b; margin-top:12px;">Сценарий влияет на вес объектов при
+                    расчёте индекса.</p>
+            </div>
+
+            <div class="footer-note">
+                LocaLife · учебный прототип · данные моделируются
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключаем библиотеки -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Turf.js для геоанализа -->
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+
+    <script>
+        (function () {
+            "use strict";
+
+            // ---------- 1. Инициализация карты ----------
+            const map = L.map('map').setView([55.7558, 37.6173], 12); // Москва
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            // ---------- 2. Данные объектов инфраструктуры (моковые, для демонстрации) ----------
+            // Координаты в формате [lat, lng]
+            const mockObjects = [
+                // Школы
+                { type: 'school', name: 'Школа №1234', lat: 55.7580, lng: 37.6200 },
+                { type: 'school', name: 'Гимназия №1567', lat: 55.7510, lng: 37.6100 },
+                { type: 'school', name: 'Лицей "Воробьевы горы"', lat: 55.7100, lng: 37.5500 },
+                // Детские сады
+                { type: 'kindergarten', name: 'Детский сад "Солнышко"', lat: 55.7560, lng: 37.6250 },
+                { type: 'kindergarten', name: 'Детский сад №45', lat: 55.7600, lng: 37.6150 },
+                // Поликлиники
+                { type: 'clinic', name: 'Городская поликлиника №5', lat: 55.7530, lng: 37.6180 },
+                { type: 'clinic', name: 'Детская поликлиника №38', lat: 55.7450, lng: 37.6050 },
+                // Парки
+                { type: 'park', name: 'Парк Горького', lat: 55.7300, lng: 37.6030 },
+                { type: 'park', name: 'Сад "Эрмитаж"', lat: 55.7700, lng: 37.6100 },
+                // Метро
+                { type: 'metro', name: 'м. Охотный ряд', lat: 55.7575, lng: 37.6160 },
+                { type: 'metro', name: 'м. Библиотека им. Ленина', lat: 55.7512, lng: 37.6090 },
+                // Аптеки
+                { type: 'pharmacy', name: 'Аптека "Ригла"', lat: 55.7550, lng: 37.6220 },
+                // Супермаркеты
+                { type: 'supermarket', name: 'Азбука вкуса', lat: 55.7620, lng: 37.6180 },
+            ];
+            // ---------- ПАРАМЕТРЫ МОДЕЛИ КОМФОРТА ----------
+            // alpha: чувствительность к расстоянию (чем выше, тем быстрее падает влияние)
+            // beta:  насыщение (чем выше, тем быстрее достигается плато)
+            const categoryParams = {
+                school: { alpha: 1.0, beta: 2.0 },  // школы важны близко, 2-3 достаточно
+                kindergarten: { alpha: 1.2, beta: 1.8 },
+                clinic: { alpha: 1.0, beta: 1.5 },
+                park: { alpha: 0.5, beta: 1.0 },  // парк может быть и дальше
+                metro: { alpha: 1.5, beta: 2.5 },  // метро нужно очень близко
+                pharmacy: { alpha: 1.2, beta: 1.2 },
+                supermarket: { alpha: 0.8, beta: 1.0 }
+            };
+
+            // Веса категорий (важность для общего индекса)
+            const categoryWeights = {
+                school: 10,
+                kindergarten: 8,
+                clinic: 7,
+                park: 5,
+                metro: 12,
+                pharmacy: 6,
+                supermarket: 4
+            };
+            // ---------- СЦЕНАРИИ И ВЕСА ----------
+            const scenarioWeights = {
+                family: {
+                    school: 12,
+                    kindergarten: 10,
+                    clinic: 8,
+                    park: 6,
+                    metro: 10,
+                    pharmacy: 5,
+                    supermarket: 4
+                },
+                senior: {
+                    school: 2,
+                    kindergarten: 1,
+                    clinic: 15,
+                    park: 12,
+                    metro: 8,
+                    pharmacy: 14,
+                    supermarket: 6
+                },
+                it: {
+                    school: 4,
+                    kindergarten: 3,
+                    clinic: 5,
+                    park: 7,
+                    metro: 15,
+                    pharmacy: 4,
+                    supermarket: 8
+                }
+            };
+
+            // Текущие активные веса (по умолчанию family)
+            let currentCategoryWeights = { ...scenarioWeights.family };
+
+
+            // Радиус 15 минут пешком ≈ 1200 метров
+            const WALK_RADIUS_KM = 1.2;
+            // Бонус за разнообразие
+            const DIVERSITY_BONUS = 5;
+            // Порог для зеленого цвета
+            const COMFORT_THRESHOLD = 25;
+
+            // ---------- 3. Создание маркеров объектов на карте ----------
+            const objectMarkers = [];
+            mockObjects.forEach(obj => {
+                const marker = L.circleMarker([obj.lat, obj.lng], {
+                    radius: 5,
+                    fillColor: '#4f46e5',
+                    color: '#fff',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.9
+                }).addTo(map);
+                marker.bindTooltip(obj.name, { permanent: false, direction: 'top' });
+                objectMarkers.push({ marker, data: obj });
+            });
+
+            // ---------- 4. Создание "лупы" (зоны доступности) ----------
+            // Используем круг Leaflet, который можно перетаскивать
+            const initialCenter = [55.7558, 37.6173];
+
+            const loupeCircle = L.circle(initialCenter, {
+                radius: WALK_RADIUS_KM * 1000, // в метрах
+                color: '#10b981',
+                weight: 3,
+                opacity: 0.8,
+                fillColor: '#10b981',
+                fillOpacity: 0.15,
+                interactive: true,
+                bubblingMouseEvents: false
+            }).addTo(map);
+
+            // Маркер центра (перетаскиваемый)
+            const centerMarker = L.marker(initialCenter, {
+                draggable: true,
+                icon: L.divIcon({
+                    className: 'custom-div-icon',
+                    html: '<div style="background:#0f172a; width:20px; height:20px; border-radius:50%; border:3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                })
+            }).addTo(map);
+
+            // Связываем перемещение маркера с обновлением круга
+            function updateLoupePosition(latlng) {
+                loupeCircle.setLatLng(latlng);
+                centerMarker.setLatLng(latlng);
+                // Пересчитываем объекты и индекс
+                updateAnalysis(latlng);
+            }
+
+            centerMarker.on('drag', function (e) {
+                const pos = e.target.getLatLng();
+                loupeCircle.setLatLng(pos);
+                updateAnalysis(pos);
+            });
+
+            // Также можно кликать по карте для перемещения лупы
+            map.on('click', function (e) {
+                updateLoupePosition(e.latlng);
+            });
+
+            // Вспомогательные функции модели
+            function distanceDecay(distanceKm, alpha) {
+                return Math.exp(-alpha * distanceKm);
+            }
+
+            function saturation(rawScore, beta) {
+                return 1 - Math.exp(-beta * rawScore);
+            }
+
+            // Расчёт скора для одной категории объектов
+            function computeCategoryScore(objectsInRadius, categoryType, alpha, beta) {
+                let rawSum = 0;
+                objectsInRadius.forEach(obj => {
+                    // качество объекта (пока у всех = 1, можно расширить)
+                    const quality = obj.quality || 1.0;
+                    rawSum += quality * distanceDecay(obj.distance, alpha);
+                });
+                return saturation(rawSum, beta);
+            }
+
+            // ---------- 5. Функция анализа объектов в радиусе ----------
+            // ---------- ОБНОВЛЁННАЯ ФУНКЦИЯ АНАЛИЗА (динамический знаменатель) ----------
+            function updateAnalysis(centerLatLng) {
+                const center = turf.point([centerLatLng.lng, centerLatLng.lat]);
+
+                // 1. Собираем все объекты в радиусе с расстояниями
+                const objectsInRadius = [];
+                mockObjects.forEach(obj => {
+                    const objPoint = turf.point([obj.lng, obj.lat]);
+                    const distance = turf.distance(center, objPoint, { units: 'kilometers' });
+
+                    if (distance <= WALK_RADIUS_KM) {
+                        objectsInRadius.push({
+                            ...obj,
+                            distance: distance
+                        });
+                    }
+                });
+
+                // 2. Группируем объекты по категориям
+                const objectsByCategory = {};
+                objectsInRadius.forEach(obj => {
+                    if (!objectsByCategory[obj.type]) {
+                        objectsByCategory[obj.type] = [];
+                    }
+                    objectsByCategory[obj.type].push(obj);
+                });
+
+                // 3. Вычисляем скор для каждой категории и общий индекс
+                let totalComfort = 0;
+                const categoryScores = {}; // для отладки / отображения
+
+                for (const category in categoryParams) {
+                    const objects = objectsByCategory[category] || [];
+                    const params = categoryParams[category];
+                    const weight = currentCategoryWeights[category] || 0;
+
+                    const catScore = computeCategoryScore(objects, category, params.alpha, params.beta);
+                    categoryScores[category] = catScore;
+                    totalComfort += weight * catScore;
+                }
+
+                // 4. Нормировка в проценты (максимально возможный балл = сумма весов)
+                const maxPossibleScore = Object.values(currentCategoryWeights).reduce((a, b) => a + b, 0);
+                let percentage = (totalComfort / maxPossibleScore) * 100;
+                percentage = Math.min(100, Math.round(percentage));
+
+                // 5. Цвет по HSL
+                const hue = percentage * 1.2;
+                const color = `hsl(${hue}, 70%, 50%)`;
+
+                // 6. Обновление интерфейса
+                updateUI(objectsInRadius, totalComfort, maxPossibleScore, percentage, color, categoryScores);
+
+                // 7. Меняем стиль лупы
+                loupeCircle.setStyle({
+                    color: color,
+                    fillColor: color
+                });
+            }
+
+            // ---------- ОБНОВЛЁННАЯ ФУНКЦИЯ ОТОБРАЖЕНИЯ ----------
+            function updateUI(objects, totalScore, maxScore, percentage, color, categoryScores) {
+                // Отображение процента
+                const scoreDisplay = document.getElementById('comfortScoreDisplay');
+                scoreDisplay.textContent = `${percentage}%`;
+                scoreDisplay.style.color = color;
+
+                // Подсказка
+                const scoreLabel = document.querySelector('.score-label');
+                if (scoreLabel) {
+                    scoreLabel.innerHTML = `индекс: ${totalScore.toFixed(2)} из ${maxScore.toFixed(0)} возможных`;
+                }
+
+                // Список объектов
+                const container = document.getElementById('objectsContainer');
+                if (objects.length === 0) {
+                    container.innerHTML = '<div class="empty-state">В зоне 15-мин пешей доступности нет объектов</div>';
+                } else {
+                    objects.sort((a, b) => a.distance - b.distance);
+
+                    let html = '<ul class="objects-list">';
+                    objects.forEach(obj => {
+                        let iconEmoji = '📍';
+                        if (obj.type === 'school') iconEmoji = '🏫';
+                        else if (obj.type === 'kindergarten') iconEmoji = '🧸';
+                        else if (obj.type === 'clinic') iconEmoji = '🏥';
+                        else if (obj.type === 'park') iconEmoji = '🌳';
+                        else if (obj.type === 'metro') iconEmoji = '🚇';
+                        else if (obj.type === 'pharmacy') iconEmoji = '💊';
+                        else if (obj.type === 'supermarket') iconEmoji = '🛒';
+
+                        // Покажем вклад объекта в свою категорию (опционально)
+                        const params = categoryParams[obj.type] || { alpha: 1.0 };
+                        const decay = distanceDecay(obj.distance, params.alpha).toFixed(2);
+
+                        html += `<li>
+                            <div class="obj-icon">${iconEmoji}</div>
+                            <div class="obj-details">
+                                <div class="obj-name">${obj.name} <span style="font-size:0.7rem; color:#94a3b8;">(вес ${decay})</span></div>
+                                <div class="obj-distance">≈ ${(obj.distance * 1000).toFixed(0)} м</div>
+                            </div>
+                        </li>`;
+                    });
+                    html += '</ul>';
+                    container.innerHTML = html;
+                }
+            }
+            // ---------- ОБРАБОТЧИК СМЕНЫ СЦЕНАРИЯ ----------
+            const scenarioSelect = document.getElementById('scenarioSelect');
+            const recalcBtn = document.getElementById('recalculateBtn');
+
+            recalcBtn.addEventListener('click', function () {
+                const scenario = scenarioSelect.value;
+                currentCategoryWeights = { ...scenarioWeights[scenario] };
+
+                // Пересчитать для текущей позиции лупы
+                const currentPos = centerMarker.getLatLng();
+                updateAnalysis(currentPos);
+            });
+
+            // ---------- 8. Первоначальный расчет ----------
+            updateAnalysis(initialCenter);
+
+            // Небольшая подсказка в консоли
+            console.log('🌟 LocaLife прототип запущен. Перетаскивайте маркер или кликайте по карте!');
+        })();
+    </script>
+</body>
+
+</html>
