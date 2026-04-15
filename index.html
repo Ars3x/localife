@@ -267,6 +267,118 @@
             color: #94a3b8;
             text-align: center;
         }
+
+        /* ---------- ДРОПДАУН ФИЛЬТР ТИПОВ ---------- */
+        .custom-dropdown {
+            position: relative;
+            width: 100%;
+            user-select: none;
+            margin-bottom: 8px;
+        }
+
+        .dropdown-header {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .dropdown-header:hover {
+            border-color: #4f46e5;
+        }
+
+        .dropdown-arrow {
+            font-size: 12px;
+            color: #64748b;
+            transition: transform 0.2s;
+        }
+
+        .custom-dropdown.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-options {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            padding: 8px 0;
+        }
+
+        .custom-dropdown.open .dropdown-options {
+            display: block;
+        }
+
+        .dropdown-option {
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .dropdown-option:hover {
+            background: #f8fafc;
+        }
+
+        .dropdown-option input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #4f46e5;
+            cursor: pointer;
+        }
+
+        .dropdown-option label {
+            flex: 1;
+            cursor: pointer;
+            color: #334155;
+        }
+
+        .dropdown-option .count-badge {
+            background: #f1f5f9;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .dropdown-actions {
+            display: flex;
+            gap: 8px;
+            padding: 8px 12px;
+            border-top: 1px solid #f1f5f9;
+            margin-top: 4px;
+        }
+
+        .dropdown-actions button {
+            flex: 1;
+            background: none;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 6px 0;
+            font-size: 0.75rem;
+            cursor: pointer;
+            color: #475569;
+        }
+
+        .dropdown-actions button:hover {
+            background: #f8fafc;
+            border-color: #4f46e5;
+        }
     </style>
 </head>
 
@@ -315,10 +427,22 @@
 
             <div class="panel-section">
                 <div class="panel-title">
-                    <span>📍 Объекты в зоне</span>
+                    <span>🔍 Объекты в зоне</span>
                 </div>
-                <div id="objectsContainer">
-                    <!-- Динамически заполняется JS -->
+
+                <!-- Выпадающий фильтр -->
+                <div class="custom-dropdown" id="typeFilterDropdown">
+                    <div class="dropdown-header" id="dropdownHeader">
+                        <span id="selectedTypesText">Все типы</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </div>
+                    <div class="dropdown-options" id="dropdownOptions">
+                        <!-- чекбоксы добавятся из JS -->
+                    </div>
+                </div>
+
+                <!-- Контейнер для списка объектов -->
+                <div id="objectsContainer" style="margin-top: 16px;">
                     <div class="empty-state">Переместите лупу, чтобы увидеть инфраструктуру</div>
                 </div>
             </div>
@@ -452,7 +576,15 @@
             const COMFORT_THRESHOLD = 25;
 
             // ---------- 3. Создание маркеров объектов на карте ----------
-            const objectMarkers = [];
+            // Группы слоёв для фильтрации видимости
+            const layerGroups = {};
+            const categoryCounts = {};
+
+            Object.keys(categoryParams).forEach(cat => {
+                layerGroups[cat] = L.layerGroup().addTo(map);
+                categoryCounts[cat] = 0;
+            });
+
             mockObjects.forEach(obj => {
                 const marker = L.circleMarker([obj.lat, obj.lng], {
                     radius: 5,
@@ -461,9 +593,14 @@
                     weight: 2,
                     opacity: 1,
                     fillOpacity: 0.9
-                }).addTo(map);
-                marker.bindTooltip(obj.name, { permanent: false, direction: 'top' });
-                objectMarkers.push({ marker, data: obj });
+                }).bindTooltip(obj.name, { permanent: false, direction: 'top' });
+
+                if (layerGroups[obj.type]) {
+                    marker.addTo(layerGroups[obj.type]);
+                    categoryCounts[obj.type]++;
+                } else {
+                    marker.addTo(map);
+                }
             });
 
             // ---------- 4. Создание "лупы" (зоны доступности) ----------
@@ -480,6 +617,7 @@
                 interactive: true,
                 bubblingMouseEvents: false
             }).addTo(map);
+            let lastAnalysisData = null;
 
             // Маркер центра (перетаскиваемый)
             const centerMarker = L.marker(initialCenter, {
@@ -519,6 +657,130 @@
             function saturation(rawScore, beta) {
                 return 1 - Math.exp(-beta * rawScore);
             }
+            // ---------- ДРОПДАУН С ФИЛЬТРАМИ ----------
+            const dropdown = document.getElementById('typeFilterDropdown');
+            const header = document.getElementById('dropdownHeader');
+            const optionsContainer = document.getElementById('dropdownOptions');
+            const selectedTextSpan = document.getElementById('selectedTypesText');
+
+            // Состояние фильтра
+            const typeCheckboxes = {};
+            const selectedTypes = new Set(Object.keys(categoryParams)); // все выбраны изначально
+
+            // Имена для отображения
+            const categoryNames = {
+                school: '🏫 Школы',
+                kindergarten: '🧸 Детские сады',
+                clinic: '🏥 Поликлиники',
+                park: '🌳 Парки',
+                metro: '🚇 Метро',
+                pharmacy: '💊 Аптеки',
+                supermarket: '🛒 Супермаркеты'
+            };
+
+            // Обновление текста в заголовке
+            function updateSelectedText() {
+                if (selectedTypes.size === Object.keys(categoryParams).length) {
+                    selectedTextSpan.textContent = 'Все типы';
+                } else if (selectedTypes.size === 0) {
+                    selectedTextSpan.textContent = 'Ничего не выбрано';
+                } else {
+                    const names = Array.from(selectedTypes).map(cat => categoryNames[cat]?.split(' ')[1] || cat);
+                    selectedTextSpan.textContent = names.join(', ');
+                }
+            }
+
+            // Применение фильтра: карта + список
+            function applyTypeFilter() {
+                // Видимость слоёв
+                for (const cat in layerGroups) {
+                    if (selectedTypes.has(cat)) {
+                        map.addLayer(layerGroups[cat]);
+                    } else {
+                        map.removeLayer(layerGroups[cat]);
+                    }
+                }
+                // Обновить список объектов, если есть данные последнего анализа
+                if (lastAnalysisData) {
+                    updateUI(
+                        lastAnalysisData.objects,
+                        lastAnalysisData.totalScore,
+                        lastAnalysisData.maxScore,
+                        lastAnalysisData.percentage,
+                        lastAnalysisData.color,
+                        lastAnalysisData.categoryScores
+                    );
+                }
+                updateSelectedText();
+            }
+
+            // Строим чекбоксы
+            Object.keys(categoryParams).forEach(cat => {
+                const optDiv = document.createElement('div');
+                optDiv.className = 'dropdown-option';
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.id = `chk_${cat}`;
+                cb.checked = true;
+                cb.addEventListener('change', (e) => {
+                    if (e.target.checked) selectedTypes.add(cat);
+                    else selectedTypes.delete(cat);
+                    applyTypeFilter();
+                });
+
+                const label = document.createElement('label');
+                label.htmlFor = `chk_${cat}`;
+                label.textContent = categoryNames[cat] || cat;
+
+                const countSpan = document.createElement('span');
+                countSpan.className = 'count-badge';
+                countSpan.id = `count_${cat}`;
+                countSpan.textContent = categoryCounts[cat] || 0;
+
+                optDiv.appendChild(cb);
+                optDiv.appendChild(label);
+                optDiv.appendChild(countSpan);
+                optionsContainer.appendChild(optDiv);
+
+                typeCheckboxes[cat] = cb;
+            });
+
+            // Кнопки "Все" / "Снять"
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'dropdown-actions';
+            actionsDiv.innerHTML = `
+                <button id="selectAllTypes">Все</button>
+                <button id="deselectAllTypes">Снять</button>
+            `;
+            optionsContainer.appendChild(actionsDiv);
+
+            document.getElementById('selectAllTypes').addEventListener('click', () => {
+                Object.keys(typeCheckboxes).forEach(cat => {
+                    typeCheckboxes[cat].checked = true;
+                    selectedTypes.add(cat);
+                });
+                applyTypeFilter();
+            });
+
+            document.getElementById('deselectAllTypes').addEventListener('click', () => {
+                Object.keys(typeCheckboxes).forEach(cat => {
+                    typeCheckboxes[cat].checked = false;
+                });
+                selectedTypes.clear();
+                applyTypeFilter();
+            });
+
+            // Открытие/закрытие
+            header.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdown.classList.toggle('open');
+            });
+            document.addEventListener('click', (e) => {
+                if (!dropdown.contains(e.target)) dropdown.classList.remove('open');
+            });
+
+            updateSelectedText();
 
             // Расчёт скора для одной категории объектов
             function computeCategoryScore(objectsInRadius, categoryType, alpha, beta) {
@@ -581,6 +843,14 @@
                 // 5. Цвет по HSL
                 const hue = percentage * 1.2;
                 const color = `hsl(${hue}, 70%, 50%)`;
+                lastAnalysisData = {
+                    objects: objectsInRadius,
+                    totalScore: totalComfort,
+                    maxScore: maxPossibleScore,
+                    percentage: percentage,
+                    color: color,
+                    categoryScores: categoryScores
+                };
 
                 // 6. Обновление интерфейса
                 updateUI(objectsInRadius, totalComfort, maxPossibleScore, percentage, color, categoryScores);
@@ -594,6 +864,8 @@
 
             // ---------- ОБНОВЛЁННАЯ ФУНКЦИЯ ОТОБРАЖЕНИЯ ----------
             function updateUI(objects, totalScore, maxScore, percentage, color, categoryScores) {
+                // Фильтруем объекты по выбранным категориям
+                const filteredObjects = objects.filter(obj => selectedTypes.has(obj.type));
                 // Отображение процента
                 const scoreDisplay = document.getElementById('comfortScoreDisplay');
                 scoreDisplay.textContent = `${percentage}%`;
@@ -607,13 +879,13 @@
 
                 // Список объектов
                 const container = document.getElementById('objectsContainer');
-                if (objects.length === 0) {
+                if (filteredObjects.length === 0) {
                     container.innerHTML = '<div class="empty-state">В зоне 15-мин пешей доступности нет объектов</div>';
                 } else {
-                    objects.sort((a, b) => a.distance - b.distance);
+                    filteredObjects.sort((a, b) => a.distance - b.distance);
 
                     let html = '<ul class="objects-list">';
-                    objects.forEach(obj => {
+                    filteredObjects.forEach(obj => {
                         let iconEmoji = '📍';
                         if (obj.type === 'school') iconEmoji = '🏫';
                         else if (obj.type === 'kindergarten') iconEmoji = '🧸';

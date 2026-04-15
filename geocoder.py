@@ -120,8 +120,8 @@ class YandexGeocoder:
             if coords is not None:
                 return coords
 
-        # Ограничиваем частоту запросов к API (примерно 5 запросов в секунду)
-        time.sleep(0.2)
+        # Ограничиваем частоту запросов к API (примерно 3 запроса в секунду)
+        time.sleep(0.3)
 
         params = {
             "apikey": self.api_key,
