@@ -468,147 +468,54 @@
         </div>
     </div>
 
-    <!-- Подключаем библиотеки -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Turf.js для геоанализа -->
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
-
     <script>
         (function () {
             "use strict";
 
-            // ---------- 1. Инициализация карты ----------
-            const map = L.map('map').setView([55.7558, 37.6173], 12); // Москва
+            // ---------- 1. Конфигурация ----------
+            const API_URL = 'http://127.0.0.1:8000/api/comfort'; // заменить при деплое
 
+            // Категории, соответствующие серверу
+            const categoryParams = {
+                school: { alpha: 1.0, beta: 2.0 },
+                clinic: { alpha: 1.0, beta: 1.5 },
+                transport_stop: { alpha: 1.0, beta: 1.5 },
+                mcd: { alpha: 1.0, beta: 1.5 },
+                railway: { alpha: 0.8, beta: 1.0 },
+                new_building: { alpha: 0.5, beta: 0.5 }
+            };
+
+            const categoryNames = {
+                school: '🏫 Школы',
+                clinic: '🏥 Поликлиники',
+                transport_stop: '🚏 Остановки',
+                mcd: '🚆 МЦД',
+                railway: '🚂 Ж/Д вокзалы',
+                new_building: '🏗 Жилые комплексы'
+            };
+
+            // Радиус
+            const WALK_RADIUS_KM = 1.2;
+
+            // ---------- 2. Карта ----------
+            const map = L.map('map').setView([55.7558, 37.6173], 12);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
                 subdomains: 'abcd',
                 maxZoom: 19
             }).addTo(map);
 
-            // ---------- 2. Данные объектов инфраструктуры (моковые, для демонстрации) ----------
-            // Координаты в формате [lat, lng]
-            const mockObjects = [
-                // Школы
-                { type: 'school', name: 'Школа №1234', lat: 55.7580, lng: 37.6200 },
-                { type: 'school', name: 'Гимназия №1567', lat: 55.7510, lng: 37.6100 },
-                { type: 'school', name: 'Лицей "Воробьевы горы"', lat: 55.7100, lng: 37.5500 },
-                // Детские сады
-                { type: 'kindergarten', name: 'Детский сад "Солнышко"', lat: 55.7560, lng: 37.6250 },
-                { type: 'kindergarten', name: 'Детский сад №45', lat: 55.7600, lng: 37.6150 },
-                // Поликлиники
-                { type: 'clinic', name: 'Городская поликлиника №5', lat: 55.7530, lng: 37.6180 },
-                { type: 'clinic', name: 'Детская поликлиника №38', lat: 55.7450, lng: 37.6050 },
-                // Парки
-                { type: 'park', name: 'Парк Горького', lat: 55.7300, lng: 37.6030 },
-                { type: 'park', name: 'Сад "Эрмитаж"', lat: 55.7700, lng: 37.6100 },
-                // Метро
-                { type: 'metro', name: 'м. Охотный ряд', lat: 55.7575, lng: 37.6160 },
-                { type: 'metro', name: 'м. Библиотека им. Ленина', lat: 55.7512, lng: 37.6090 },
-                // Аптеки
-                { type: 'pharmacy', name: 'Аптека "Ригла"', lat: 55.7550, lng: 37.6220 },
-                // Супермаркеты
-                { type: 'supermarket', name: 'Азбука вкуса', lat: 55.7620, lng: 37.6180 },
-            ];
-            // ---------- ПАРАМЕТРЫ МОДЕЛИ КОМФОРТА ----------
-            // alpha: чувствительность к расстоянию (чем выше, тем быстрее падает влияние)
-            // beta:  насыщение (чем выше, тем быстрее достигается плато)
-            const categoryParams = {
-                school: { alpha: 1.0, beta: 2.0 },  // школы важны близко, 2-3 достаточно
-                kindergarten: { alpha: 1.2, beta: 1.8 },
-                clinic: { alpha: 1.0, beta: 1.5 },
-                park: { alpha: 0.5, beta: 1.0 },  // парк может быть и дальше
-                metro: { alpha: 1.5, beta: 2.5 },  // метро нужно очень близко
-                pharmacy: { alpha: 1.2, beta: 1.2 },
-                supermarket: { alpha: 0.8, beta: 1.0 }
-            };
-
-            // Веса категорий (важность для общего индекса)
-            const categoryWeights = {
-                school: 10,
-                kindergarten: 8,
-                clinic: 7,
-                park: 5,
-                metro: 12,
-                pharmacy: 6,
-                supermarket: 4
-            };
-            // ---------- СЦЕНАРИИ И ВЕСА ----------
-            const scenarioWeights = {
-                family: {
-                    school: 12,
-                    kindergarten: 10,
-                    clinic: 8,
-                    park: 6,
-                    metro: 10,
-                    pharmacy: 5,
-                    supermarket: 4
-                },
-                senior: {
-                    school: 2,
-                    kindergarten: 1,
-                    clinic: 15,
-                    park: 12,
-                    metro: 8,
-                    pharmacy: 14,
-                    supermarket: 6
-                },
-                it: {
-                    school: 4,
-                    kindergarten: 3,
-                    clinic: 5,
-                    park: 7,
-                    metro: 15,
-                    pharmacy: 4,
-                    supermarket: 8
-                }
-            };
-
-            // Текущие активные веса (по умолчанию family)
-            let currentCategoryWeights = { ...scenarioWeights.family };
-
-
-            // Радиус 15 минут пешком ≈ 1200 метров
-            const WALK_RADIUS_KM = 1.2;
-            // Бонус за разнообразие
-            const DIVERSITY_BONUS = 5;
-            // Порог для зеленого цвета
-            const COMFORT_THRESHOLD = 25;
-
-            // ---------- 3. Создание маркеров объектов на карте ----------
-            // Группы слоёв для фильтрации видимости
+            // ---------- 3. Слои и лупа ----------
             const layerGroups = {};
-            const categoryCounts = {};
-
             Object.keys(categoryParams).forEach(cat => {
                 layerGroups[cat] = L.layerGroup().addTo(map);
-                categoryCounts[cat] = 0;
             });
 
-            mockObjects.forEach(obj => {
-                const marker = L.circleMarker([obj.lat, obj.lng], {
-                    radius: 5,
-                    fillColor: '#4f46e5',
-                    color: '#fff',
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.9
-                }).bindTooltip(obj.name, { permanent: false, direction: 'top' });
+            const initialCenter = { lat: 55.7558, lng: 37.6173 };
 
-                if (layerGroups[obj.type]) {
-                    marker.addTo(layerGroups[obj.type]);
-                    categoryCounts[obj.type]++;
-                } else {
-                    marker.addTo(map);
-                }
-            });
-
-            // ---------- 4. Создание "лупы" (зоны доступности) ----------
-            // Используем круг Leaflet, который можно перетаскивать
-            const initialCenter = [55.7558, 37.6173];
-
-            const loupeCircle = L.circle(initialCenter, {
-                radius: WALK_RADIUS_KM * 1000, // в метрах
+            const loupeCircle = L.circle([initialCenter.lat, initialCenter.lng], {
+                radius: WALK_RADIUS_KM * 1000,
                 color: '#10b981',
                 weight: 3,
                 opacity: 0.8,
@@ -617,10 +524,8 @@
                 interactive: true,
                 bubblingMouseEvents: false
             }).addTo(map);
-            let lastAnalysisData = null;
 
-            // Маркер центра (перетаскиваемый)
-            const centerMarker = L.marker(initialCenter, {
+            const centerMarker = L.marker([initialCenter.lat, initialCenter.lng], {
                 draggable: true,
                 icon: L.divIcon({
                     className: 'custom-div-icon',
@@ -630,55 +535,17 @@
                 })
             }).addTo(map);
 
-            // Связываем перемещение маркера с обновлением круга
-            function updateLoupePosition(latlng) {
-                loupeCircle.setLatLng(latlng);
-                centerMarker.setLatLng(latlng);
-                // Пересчитываем объекты и индекс
-                updateAnalysis(latlng);
-            }
+            // ---------- 4. Состояние и фильтры ----------
+            let lastAnalysisData = null;
+            const selectedTypes = new Set(Object.keys(categoryParams));
 
-            centerMarker.on('drag', function (e) {
-                const pos = e.target.getLatLng();
-                loupeCircle.setLatLng(pos);
-                updateAnalysis(pos);
-            });
-
-            // Также можно кликать по карте для перемещения лупы
-            map.on('click', function (e) {
-                updateLoupePosition(e.latlng);
-            });
-
-            // Вспомогательные функции модели
-            function distanceDecay(distanceKm, alpha) {
-                return Math.exp(-alpha * distanceKm);
-            }
-
-            function saturation(rawScore, beta) {
-                return 1 - Math.exp(-beta * rawScore);
-            }
-            // ---------- ДРОПДАУН С ФИЛЬТРАМИ ----------
+            // Dropdown
             const dropdown = document.getElementById('typeFilterDropdown');
             const header = document.getElementById('dropdownHeader');
             const optionsContainer = document.getElementById('dropdownOptions');
             const selectedTextSpan = document.getElementById('selectedTypesText');
-
-            // Состояние фильтра
             const typeCheckboxes = {};
-            const selectedTypes = new Set(Object.keys(categoryParams)); // все выбраны изначально
 
-            // Имена для отображения
-            const categoryNames = {
-                school: '🏫 Школы',
-                kindergarten: '🧸 Детские сады',
-                clinic: '🏥 Поликлиники',
-                park: '🌳 Парки',
-                metro: '🚇 Метро',
-                pharmacy: '💊 Аптеки',
-                supermarket: '🛒 Супермаркеты'
-            };
-
-            // Обновление текста в заголовке
             function updateSelectedText() {
                 if (selectedTypes.size === Object.keys(categoryParams).length) {
                     selectedTextSpan.textContent = 'Все типы';
@@ -690,9 +557,7 @@
                 }
             }
 
-            // Применение фильтра: карта + список
             function applyTypeFilter() {
-                // Видимость слоёв
                 for (const cat in layerGroups) {
                     if (selectedTypes.has(cat)) {
                         map.addLayer(layerGroups[cat]);
@@ -700,25 +565,17 @@
                         map.removeLayer(layerGroups[cat]);
                     }
                 }
-                // Обновить список объектов, если есть данные последнего анализа
                 if (lastAnalysisData) {
-                    updateUI(
-                        lastAnalysisData.objects,
-                        lastAnalysisData.totalScore,
-                        lastAnalysisData.maxScore,
-                        lastAnalysisData.percentage,
-                        lastAnalysisData.color,
-                        lastAnalysisData.categoryScores
-                    );
+                    updateUI(lastAnalysisData.objects, lastAnalysisData.totalScore,
+                        lastAnalysisData.maxScore, lastAnalysisData.percentage,
+                        lastAnalysisData.color, lastAnalysisData.categoryScores);
                 }
                 updateSelectedText();
             }
 
-            // Строим чекбоксы
             Object.keys(categoryParams).forEach(cat => {
                 const optDiv = document.createElement('div');
                 optDiv.className = 'dropdown-option';
-
                 const cb = document.createElement('input');
                 cb.type = 'checkbox';
                 cb.id = `chk_${cat}`;
@@ -728,33 +585,20 @@
                     else selectedTypes.delete(cat);
                     applyTypeFilter();
                 });
-
                 const label = document.createElement('label');
                 label.htmlFor = `chk_${cat}`;
                 label.textContent = categoryNames[cat] || cat;
-
-                const countSpan = document.createElement('span');
-                countSpan.className = 'count-badge';
-                countSpan.id = `count_${cat}`;
-                countSpan.textContent = categoryCounts[cat] || 0;
-
                 optDiv.appendChild(cb);
                 optDiv.appendChild(label);
-                optDiv.appendChild(countSpan);
                 optionsContainer.appendChild(optDiv);
-
                 typeCheckboxes[cat] = cb;
             });
 
-            // Кнопки "Все" / "Снять"
+            // Кнопки все/снять
             const actionsDiv = document.createElement('div');
             actionsDiv.className = 'dropdown-actions';
-            actionsDiv.innerHTML = `
-                <button id="selectAllTypes">Все</button>
-                <button id="deselectAllTypes">Снять</button>
-            `;
+            actionsDiv.innerHTML = '<button id="selectAllTypes">Все</button><button id="deselectAllTypes">Снять</button>';
             optionsContainer.appendChild(actionsDiv);
-
             document.getElementById('selectAllTypes').addEventListener('click', () => {
                 Object.keys(typeCheckboxes).forEach(cat => {
                     typeCheckboxes[cat].checked = true;
@@ -762,173 +606,133 @@
                 });
                 applyTypeFilter();
             });
-
             document.getElementById('deselectAllTypes').addEventListener('click', () => {
-                Object.keys(typeCheckboxes).forEach(cat => {
-                    typeCheckboxes[cat].checked = false;
-                });
+                Object.keys(typeCheckboxes).forEach(cat => typeCheckboxes[cat].checked = false);
                 selectedTypes.clear();
                 applyTypeFilter();
             });
 
-            // Открытие/закрытие
-            header.addEventListener('click', (e) => {
-                e.stopPropagation();
-                dropdown.classList.toggle('open');
-            });
-            document.addEventListener('click', (e) => {
-                if (!dropdown.contains(e.target)) dropdown.classList.remove('open');
-            });
+            header.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('open'); });
+            document.addEventListener('click', (e) => { if (!dropdown.contains(e.target)) dropdown.classList.remove('open'); });
 
             updateSelectedText();
 
-            // Расчёт скора для одной категории объектов
-            function computeCategoryScore(objectsInRadius, categoryType, alpha, beta) {
-                let rawSum = 0;
-                objectsInRadius.forEach(obj => {
-                    // качество объекта (пока у всех = 1, можно расширить)
-                    const quality = obj.quality || 1.0;
-                    rawSum += quality * distanceDecay(obj.distance, alpha);
-                });
-                return saturation(rawSum, beta);
+            // ---------- 5. Логика обновления ----------
+            function moveLoupe(latlng) {
+                loupeCircle.setLatLng(latlng);
+                centerMarker.setLatLng(latlng);
+                updateAnalysis(latlng);
             }
 
-            // ---------- 5. Функция анализа объектов в радиусе ----------
-            // ---------- ОБНОВЛЁННАЯ ФУНКЦИЯ АНАЛИЗА (динамический знаменатель) ----------
-            function updateAnalysis(centerLatLng) {
-                const center = turf.point([centerLatLng.lng, centerLatLng.lat]);
+            centerMarker.on('drag', function (e) { moveLoupe(e.target.getLatLng()); });
+            map.on('click', function (e) { moveLoupe(e.latlng); });
 
-                // 1. Собираем все объекты в радиусе с расстояниями
-                const objectsInRadius = [];
-                mockObjects.forEach(obj => {
-                    const objPoint = turf.point([obj.lng, obj.lat]);
-                    const distance = turf.distance(center, objPoint, { units: 'kilometers' });
-
-                    if (distance <= WALK_RADIUS_KM) {
-                        objectsInRadius.push({
-                            ...obj,
-                            distance: distance
-                        });
+            async function updateAnalysis(centerLatLng) {
+                const scenario = document.getElementById('scenarioSelect').value;
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            lat: centerLatLng.lat,
+                            lng: centerLatLng.lng,
+                            radius: WALK_RADIUS_KM,
+                            scenario: scenario
+                        })
+                    });
+                    if (!response.ok) {
+                        const errText = await response.text();
+                        throw new Error(`${response.status}: ${errText}`);
                     }
-                });
+                    const data = await response.json();
+                    updateMarkersFromData(data.objects);
 
-                // 2. Группируем объекты по категориям
-                const objectsByCategory = {};
-                objectsInRadius.forEach(obj => {
-                    if (!objectsByCategory[obj.type]) {
-                        objectsByCategory[obj.type] = [];
-                    }
-                    objectsByCategory[obj.type].push(obj);
-                });
+                    const hue = data.percentage * 1.2;
+                    const color = `hsl(${hue}, 70%, 50%)`;
 
-                // 3. Вычисляем скор для каждой категории и общий индекс
-                let totalComfort = 0;
-                const categoryScores = {}; // для отладки / отображения
+                    lastAnalysisData = {
+                        objects: data.objects,
+                        totalScore: data.totalScore,
+                        maxScore: data.maxScore,
+                        percentage: data.percentage,
+                        color: color,
+                        categoryScores: data.categoryScores
+                    };
 
-                for (const category in categoryParams) {
-                    const objects = objectsByCategory[category] || [];
-                    const params = categoryParams[category];
-                    const weight = currentCategoryWeights[category] || 0;
-
-                    const catScore = computeCategoryScore(objects, category, params.alpha, params.beta);
-                    categoryScores[category] = catScore;
-                    totalComfort += weight * catScore;
+                    updateUI(data.objects, data.totalScore, data.maxScore, data.percentage, color, data.categoryScores);
+                    loupeCircle.setStyle({ color: color, fillColor: color });
+                } catch (error) {
+                    console.error(error);
+                    alert('Ошибка получения данных: ' + error.message);
                 }
-
-                // 4. Нормировка в проценты (максимально возможный балл = сумма весов)
-                const maxPossibleScore = Object.values(currentCategoryWeights).reduce((a, b) => a + b, 0);
-                let percentage = (totalComfort / maxPossibleScore) * 100;
-                percentage = Math.min(100, Math.round(percentage));
-
-                // 5. Цвет по HSL
-                const hue = percentage * 1.2;
-                const color = `hsl(${hue}, 70%, 50%)`;
-                lastAnalysisData = {
-                    objects: objectsInRadius,
-                    totalScore: totalComfort,
-                    maxScore: maxPossibleScore,
-                    percentage: percentage,
-                    color: color,
-                    categoryScores: categoryScores
-                };
-
-                // 6. Обновление интерфейса
-                updateUI(objectsInRadius, totalComfort, maxPossibleScore, percentage, color, categoryScores);
-
-                // 7. Меняем стиль лупы
-                loupeCircle.setStyle({
-                    color: color,
-                    fillColor: color
-                });
             }
 
-            // ---------- ОБНОВЛЁННАЯ ФУНКЦИЯ ОТОБРАЖЕНИЯ ----------
+            function updateMarkersFromData(objects) {
+                Object.values(layerGroups).forEach(lg => lg.clearLayers());
+                objects.forEach(obj => {
+                    const marker = L.circleMarker([obj.lat, obj.lng], {
+                        radius: 5,
+                        fillColor: '#4f46e5',
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.9
+                    }).bindTooltip(obj.name, { permanent: false, direction: 'top' });
+                    if (layerGroups[obj.type]) {
+                        marker.addTo(layerGroups[obj.type]);
+                    } else {
+                        layerGroups[obj.type] = L.layerGroup().addTo(map);
+                        marker.addTo(layerGroups[obj.type]);
+                    }
+                });
+                applyTypeFilter();
+            }
+
             function updateUI(objects, totalScore, maxScore, percentage, color, categoryScores) {
-                // Фильтруем объекты по выбранным категориям
                 const filteredObjects = objects.filter(obj => selectedTypes.has(obj.type));
-                // Отображение процента
-                const scoreDisplay = document.getElementById('comfortScoreDisplay');
-                scoreDisplay.textContent = `${percentage}%`;
-                scoreDisplay.style.color = color;
 
-                // Подсказка
-                const scoreLabel = document.querySelector('.score-label');
-                if (scoreLabel) {
-                    scoreLabel.innerHTML = `индекс: ${totalScore.toFixed(2)} из ${maxScore.toFixed(0)} возможных`;
-                }
+                document.getElementById('comfortScoreDisplay').textContent = `${percentage}%`;
+                document.getElementById('comfortScoreDisplay').style.color = color;
 
-                // Список объектов
+                const label = document.querySelector('.score-label');
+                if (label) label.innerHTML = `индекс: ${totalScore.toFixed(2)} из ${maxScore.toFixed(0)}`;
+
                 const container = document.getElementById('objectsContainer');
                 if (filteredObjects.length === 0) {
-                    container.innerHTML = '<div class="empty-state">В зоне 15-мин пешей доступности нет объектов</div>';
-                } else {
-                    filteredObjects.sort((a, b) => a.distance - b.distance);
-
-                    let html = '<ul class="objects-list">';
-                    filteredObjects.forEach(obj => {
-                        let iconEmoji = '📍';
-                        if (obj.type === 'school') iconEmoji = '🏫';
-                        else if (obj.type === 'kindergarten') iconEmoji = '🧸';
-                        else if (obj.type === 'clinic') iconEmoji = '🏥';
-                        else if (obj.type === 'park') iconEmoji = '🌳';
-                        else if (obj.type === 'metro') iconEmoji = '🚇';
-                        else if (obj.type === 'pharmacy') iconEmoji = '💊';
-                        else if (obj.type === 'supermarket') iconEmoji = '🛒';
-
-                        // Покажем вклад объекта в свою категорию (опционально)
-                        const params = categoryParams[obj.type] || { alpha: 1.0 };
-                        const decay = distanceDecay(obj.distance, params.alpha).toFixed(2);
-
-                        html += `<li>
-                            <div class="obj-icon">${iconEmoji}</div>
-                            <div class="obj-details">
-                                <div class="obj-name">${obj.name} <span style="font-size:0.7rem; color:#94a3b8;">(вес ${decay})</span></div>
-                                <div class="obj-distance">≈ ${(obj.distance * 1000).toFixed(0)} м</div>
-                            </div>
-                        </li>`;
-                    });
-                    html += '</ul>';
-                    container.innerHTML = html;
+                    container.innerHTML = '<div class="empty-state">В зоне нет объектов выбранных типов</div>';
+                    return;
                 }
+
+                filteredObjects.sort((a, b) => a.distance - b.distance);
+                let html = '<ul class="objects-list">';
+                filteredObjects.forEach(obj => {
+                    let iconEmoji = '📍';
+                    if (obj.type === 'school') iconEmoji = '🏫';
+                    else if (obj.type === 'clinic') iconEmoji = '🏥';
+                    else if (obj.type === 'transport_stop') iconEmoji = '🚏';
+                    else if (obj.type === 'mcd') iconEmoji = '🚆';
+                    else if (obj.type === 'railway') iconEmoji = '🚂';
+                    else if (obj.type === 'new_building') iconEmoji = '🏗';
+
+                    html += `<li>
+                        <div class="obj-icon">${iconEmoji}</div>
+                        <div class="obj-details">
+                            <div class="obj-name">${obj.name}</div>
+                            <div class="obj-distance">≈ ${(obj.distance * 1000).toFixed(0)} м</div>
+                        </div>
+                    </li>`;
+                });
+                html += '</ul>';
+                container.innerHTML = html;
             }
-            // ---------- ОБРАБОТЧИК СМЕНЫ СЦЕНАРИЯ ----------
-            const scenarioSelect = document.getElementById('scenarioSelect');
-            const recalcBtn = document.getElementById('recalculateBtn');
 
-            recalcBtn.addEventListener('click', function () {
-                const scenario = scenarioSelect.value;
-                currentCategoryWeights = { ...scenarioWeights[scenario] };
-
-                // Пересчитать для текущей позиции лупы
-                const currentPos = centerMarker.getLatLng();
-                updateAnalysis(currentPos);
+            // ---------- 6. Сценарий (пока без влияния на сервер, можно расширить) ----------
+            document.getElementById('recalculateBtn').addEventListener('click', () => {
+                updateAnalysis(centerMarker.getLatLng());
             });
 
-            // ---------- 8. Первоначальный расчет ----------
+            // Первый запуск
             updateAnalysis(initialCenter);
-
-            // Небольшая подсказка в консоли
-            console.log('🌟 LocaLife прототип запущен. Перетаскивайте маркер или кликайте по карте!');
         })();
     </script>
 </body>
