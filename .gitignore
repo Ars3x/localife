@@ -2,3 +2,14 @@ data/
 .env
 .venv
 __pycache__
+test.ipynb
+flats_backup.csv
+flats.csv
+coords_to_db.csv
+flats_to_db.csv
+schools.txt
+test2.ipynb
+medical_organizations_with_branches.csv
+medical_orgs.json
+schools_moscow.csv
+Новая папка
