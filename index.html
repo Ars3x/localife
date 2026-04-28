@@ -496,6 +496,15 @@
                 new_building: '🏗 Жилые комплексы'
             };
 
+            const categoryColors = {
+                school: '#1a70f0',          // синий
+                clinic: '#fc0505',          // красный
+                transport_stop: '#f7fa39',  // желтый
+                mcd: '#05ecfc',             // голубой
+                railway: '#577278',         // серый
+                new_building: '#b802fa'     // фиолетовый
+            };
+
             // Радиус
             const WALK_RADIUS_KM = 1.2;
 
@@ -508,6 +517,8 @@
 
             // ---------- 3. Слои и лупа ----------
             const layerGroups = {};
+            // Постоянный слой для всех жилых комплексов
+            const allBuildingsLayer = L.layerGroup().addTo(map);
             Object.keys(categoryParams).forEach(cat => {
                 layerGroups[cat] = L.layerGroup().addTo(map);
             });
@@ -626,6 +637,46 @@
 
             centerMarker.on('drag', function (e) { moveLoupe(e.target.getLatLng()); });
             map.on('click', function (e) { moveLoupe(e.latlng); });
+            async function loadAllBuildings() {
+                try {
+                    // Запрашиваем все здания в радиусе 100 км от центра Москвы
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            lat: 55.7558,
+                            lng: 37.6173,
+                            radius: 100,  // покрывает всю Москву и область
+                            scenario: 'family'
+                        })
+                    });
+                    if (!response.ok) {
+                        const errText = await response.text();
+                        throw new Error(`${response.status}: ${errText}`);
+                    }
+                    const data = await response.json();
+                    
+                    // Отфильтровываем только new_building
+                    const buildings = data.objects.filter(obj => obj.type === 'new_building');
+                    
+                    // Очищаем постоянный слой и заполняем его
+                    allBuildingsLayer.clearLayers();
+                    buildings.forEach(obj => {
+                        const marker = L.circleMarker([obj.lat, obj.lng], {
+                            radius: 5,
+                            fillColor: categoryColors.new_building,   // оранжевый, чтобы отличались
+                            color: '#fff',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.9
+                        }).bindTooltip(obj.name, { permanent: false, direction: 'top' });
+                        marker.addTo(allBuildingsLayer);
+                    });
+                    console.log(`Загружено ${buildings.length} жилых комплексов`);
+                } catch (error) {
+                    console.error('Ошибка загрузки всех зданий:', error);
+                }
+            }
 
             async function updateAnalysis(centerLatLng) {
                 const scenario = document.getElementById('scenarioSelect').value;
@@ -668,16 +719,23 @@
             }
 
             function updateMarkersFromData(objects) {
+                // 1. Очищаем все временные слои (кроме постоянного allBuildingsLayer)
                 Object.values(layerGroups).forEach(lg => lg.clearLayers());
+
                 objects.forEach(obj => {
+                    // 2. Пропускаем жилые комплексы – они уже нарисованы в allBuildingsLayer
+                    if (obj.type === 'new_building') return;
+                    const markerColor = categoryColors[obj.type] || '#4f46e5'; // fallback
+
                     const marker = L.circleMarker([obj.lat, obj.lng], {
                         radius: 5,
-                        fillColor: '#4f46e5',
+                        fillColor: markerColor,
                         color: '#fff',
                         weight: 2,
                         opacity: 1,
                         fillOpacity: 0.9
                     }).bindTooltip(obj.name, { permanent: false, direction: 'top' });
+
                     if (layerGroups[obj.type]) {
                         marker.addTo(layerGroups[obj.type]);
                     } else {
@@ -685,6 +743,7 @@
                         marker.addTo(layerGroups[obj.type]);
                     }
                 });
+
                 applyTypeFilter();
             }
 
@@ -730,6 +789,8 @@
             document.getElementById('recalculateBtn').addEventListener('click', () => {
                 updateAnalysis(centerMarker.getLatLng());
             });
+            // Первоначальная загрузка всех жилых комплексов (независимо от лупы)
+            loadAllBuildings();
 
             // Первый запуск
             updateAnalysis(initialCenter);
