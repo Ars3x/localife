@@ -516,6 +516,20 @@
                 maxZoom: 19
             }).addTo(map);
 
+            let updateTimer = null;          // таймер для debounce
+            let abortController = null;      // контроллер отмены активного fetch
+
+            const DEBOUNCE_DELAY = 300;      // мс, можно подобрать 200-400
+
+            function scheduleUpdate(latlng) {
+                // Отменяем предыдущий запланированный запуск
+                if (updateTimer) clearTimeout(updateTimer);
+                // Планируем новый через DEBOUNCE_DELAY
+                updateTimer = setTimeout(() => {
+                    updateAnalysis(latlng);
+                }, DEBOUNCE_DELAY);
+            }
+
             // ---------- 3. Слои и лупа ----------
             const layerGroups = {};
             // Постоянный слой для всех жилых комплексов
@@ -639,7 +653,8 @@
             function moveLoupe(latlng) {
                 loupeCircle.setLatLng(latlng);
                 centerMarker.setLatLng(latlng);
-                updateAnalysis(latlng);
+                //updateAnalysis(latlng);
+                scheduleUpdate(latlng)
             }
 
             centerMarker.on('drag', function (e) { moveLoupe(e.target.getLatLng()); });
@@ -686,6 +701,11 @@
             }
 
             async function updateAnalysis(centerLatLng) {
+                // Отменяем предыдущий незавершённый fetch
+                if (abortController) abortController.abort();
+                abortController = new AbortController();
+                const { signal } = abortController;
+
                 const scenario = document.getElementById('scenarioSelect').value;
                 try {
                     const response = await fetch(API_URL, {
@@ -696,7 +716,8 @@
                             lng: centerLatLng.lng,
                             radius: WALK_RADIUS_KM,
                             scenario: scenario
-                        })
+                        }),
+                        signal   // передаём сигнал
                     });
                     if (!response.ok) {
                         const errText = await response.text();
@@ -722,6 +743,7 @@
                     updateUI(data.objects, data.totalScore, data.maxScore, data.percentage, color, data.categoryScores, data.ndvi);
                     loupeCircle.setStyle({ color: color, fillColor: color });
                 } catch (error) {
+                    if (error.name === 'AbortError') return; // игнорируем отмену
                     console.error(error);
                     alert('Ошибка получения данных: ' + error.message);
                 }
