@@ -1,6 +1,7 @@
 data/
 .env
 .venv
+.config
 __pycache__
 test.ipynb
 flats_backup.csv

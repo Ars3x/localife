@@ -412,6 +412,7 @@
                 <div class="comfort-score">
                     <div class="score-value" id="comfortScoreDisplay">—</div>
                     <div class="score-label">баллов в радиусе 15 мин пешком</div>
+                    <div class="score-label" id="ndviDisplay"></div>
                 </div>
                 <div class="legend">
                     <div class="legend-item">
@@ -577,9 +578,15 @@
                     }
                 }
                 if (lastAnalysisData) {
-                    updateUI(lastAnalysisData.objects, lastAnalysisData.totalScore,
-                        lastAnalysisData.maxScore, lastAnalysisData.percentage,
-                        lastAnalysisData.color, lastAnalysisData.categoryScores);
+                    updateUI(
+                        lastAnalysisData.objects,
+                        lastAnalysisData.totalScore,
+                        lastAnalysisData.maxScore,
+                        lastAnalysisData.percentage,
+                        lastAnalysisData.color,
+                        lastAnalysisData.categoryScores,
+                        lastAnalysisData.ndvi
+                    );
                 }
                 updateSelectedText();
             }
@@ -655,10 +662,10 @@
                         throw new Error(`${response.status}: ${errText}`);
                     }
                     const data = await response.json();
-                    
+
                     // Отфильтровываем только new_building
                     const buildings = data.objects.filter(obj => obj.type === 'new_building');
-                    
+
                     // Очищаем постоянный слой и заполняем его
                     allBuildingsLayer.clearLayers();
                     buildings.forEach(obj => {
@@ -707,10 +714,12 @@
                         maxScore: data.maxScore,
                         percentage: data.percentage,
                         color: color,
-                        categoryScores: data.categoryScores
+                        categoryScores: data.categoryScores,
+                        ndvi: data.ndvi
                     };
+                    console.log(data.ndvi)
 
-                    updateUI(data.objects, data.totalScore, data.maxScore, data.percentage, color, data.categoryScores);
+                    updateUI(data.objects, data.totalScore, data.maxScore, data.percentage, color, data.categoryScores, data.ndvi);
                     loupeCircle.setStyle({ color: color, fillColor: color });
                 } catch (error) {
                     console.error(error);
@@ -747,10 +756,15 @@
                 applyTypeFilter();
             }
 
-            function updateUI(objects, totalScore, maxScore, percentage, color, categoryScores) {
+            function updateUI(objects, totalScore, maxScore, percentage, color, categoryScores, ndvi = null) {
                 const filteredObjects = objects.filter(obj => selectedTypes.has(obj.type));
 
                 document.getElementById('comfortScoreDisplay').textContent = `${percentage}%`;
+                if (ndvi != null) {
+                    document.getElementById('ndviDisplay').textContent = `🌿 NDVI: ${ndvi.toFixed(2)}`;
+                } else {
+                    document.getElementById('ndviDisplay').textContent = '';
+                }
                 document.getElementById('comfortScoreDisplay').style.color = color;
 
                 const label = document.querySelector('.score-label');

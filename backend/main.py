@@ -5,7 +5,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import asyncpg
+import asyncio
 from dotenv import load_dotenv
+from ndvi import init_ee, get_location_score
 
 load_dotenv()
 
@@ -62,6 +64,8 @@ class ComfortResponse(BaseModel):
     maxScore: float
     percentage: float
     categoryScores: Dict[str, float]
+    ndvi: Optional[float] = None
+    
 
 @app.on_event("startup")
 async def startup():
@@ -101,6 +105,10 @@ async def startup():
                 except Exception:
                     continue
     await pool.close()
+    try:
+        init_ee(project="localife-ndvi", key_path="/home/user1/nis-project/localife/backend/.config/earthengine/localife-ndvi.json")
+    except Exception as e:
+        print(f"[WARN] Google Earth Engine не инициализирован: {e}")
     print(f"Cache loaded: {len(cached_objects)} objects")
 
 @app.post("/api/comfort", response_model=ComfortResponse)
@@ -134,16 +142,30 @@ async def get_comfort(req: ComfortRequest):
 
         max_possible = sum(p["weight"] for p in CATEGORY_PARAMS.values())
         percentage = min(100.0, round(total_comfort / max_possible * 100))
+        
+        try:
+            ndvi_value = await asyncio.to_thread(
+                get_location_score,
+                req.lat, req.lng,
+                buffer_m=500,
+                max_cloud_pct=60.0
+            )
+        except Exception as e:
+            ndvi_value = None
+            print(f"Ошибка получения NDVI: {e}")
 
         return ComfortResponse(
             objects=objects_in_radius,
             totalScore=total_comfort,
             maxScore=max_possible,
             percentage=percentage,
-            categoryScores=category_scores
+            categoryScores=category_scores,
+            ndvi=ndvi_value
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+    
 
 if __name__ == "__main__":
     import uvicorn
