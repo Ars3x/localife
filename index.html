@@ -481,29 +481,51 @@
             // Категории, соответствующие серверу
             const categoryParams = {
                 school: { alpha: 1.0, beta: 2.0 },
-                clinic: { alpha: 1.0, beta: 1.5 },
-                transport_stop: { alpha: 1.0, beta: 1.5 },
+                child_clinic: { alpha: 1.0, beta: 2.0 },
+                dent_child_clinic: { alpha: 1.0, beta: 2.0 },
+                //clinic: { alpha: 1.0, beta: 1.5 },
+                //transport_stop: { alpha: 1.0, beta: 1.5 },
                 mcd: { alpha: 1.0, beta: 1.5 },
                 railway: { alpha: 0.8, beta: 1.0 },
-                new_building: { alpha: 0.5, beta: 0.5 }
+                new_building: { alpha: 0.5, beta: 0.5 },
+                dom_culturi: { alpha: 0.5, beta: 0.5 },
+                metro: { alpha: 1.0, beta: 2.0 },
+                adult_polyclinic: { alpha: 1.0, beta: 2.0 },
+                adult_dent: { alpha: 1.0, beta: 2.0 },
+                theatre: { alpha: 0.5, beta: 0.5 }
             };
-
+            //https://symbl.cc/ru/emoji/
             const categoryNames = {
                 school: '🏫 Школы',
-                clinic: '🏥 Поликлиники',
-                transport_stop: '🚏 Остановки',
+                child_clinic: '👶🏥 Детские поликлиники',
+                dent_child_clinic: '👶🦷 Детские стоматологии',
+                //clinic: '🏥 Поликлиники',
+                //transport_stop: '🚏 Остановки',
                 mcd: '🚆 МЦД',
                 railway: '🚂 Ж/Д вокзалы',
-                new_building: '🏗 Жилые комплексы'
+                new_building: '🏗 Жилые комплексы',
+                dom_culturi: '💃 Дома культуры',
+                metro: '🚇 Метро',
+                adult_polyclinic: '🏥 Взрослые поликлиники',
+                adult_dent: '🦷 Взрослые стоматологии',
+                theatre: '🎭 Театры'
+
             };
 
             const categoryColors = {
                 school: '#1a70f0',          // синий
-                clinic: '#fc0505',          // красный
-                transport_stop: '#f7fa39',  // желтый
+                child_clinic: '#34ebd8',
+                dent_child_clinic: '#b4d9b6',
+                //clinic: '#fc0505',          // красный
+                //transport_stop: '#f7fa39',  // желтый
                 mcd: '#05ecfc',             // голубой
                 railway: '#577278',         // серый
-                new_building: '#b802fa'     // фиолетовый
+                new_building: '#b802fa',     // фиолетовый
+                dom_culturi: '#697d79',
+                metro: '#edb48c',
+                adult_polyclinic: '#abad9a',
+                adult_dent: '#f0faf7',
+                theatre: '#edb4e7'
             };
 
             // Радиус
