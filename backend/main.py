@@ -58,6 +58,36 @@ TABLE_MAP = {
 def distance_decay(d, alpha): return math.exp(-alpha * d)
 def saturation(x, beta): return 1.0 - math.exp(-beta * x)
 
+SCHOOL_TOP_RANK_LIMIT = 400
+SCHOOL_DISTANCE_FACTORS = (
+    (0.5, 1.0),
+    (1.0, 0.7),
+    (1.5, 0.4),
+)
+
+def normalize_school_rank(rank: Any) -> Optional[int]:
+    if rank is None:
+        return None
+    try:
+        return int(str(rank).replace("\xa0", "").replace(" ", ""))
+    except (TypeError, ValueError):
+        return None
+
+def school_rank_score(rank: Any) -> float:
+    normalized_rank = normalize_school_rank(rank)
+    if normalized_rank is None or normalized_rank < 1 or normalized_rank > SCHOOL_TOP_RANK_LIMIT:
+        return 0.0
+    return (SCHOOL_TOP_RANK_LIMIT + 1 - normalized_rank) / SCHOOL_TOP_RANK_LIMIT
+
+def school_distance_factor(distance_km: float) -> float:
+    for max_distance, factor in SCHOOL_DISTANCE_FACTORS:
+        if distance_km <= max_distance:
+            return factor
+    return 0.0
+
+def school_score(school: Dict[str, Any]) -> float:
+    return school_rank_score(school.get("rank")) * school_distance_factor(school["distance"])
+
 def haversine_distance(lat1, lng1, lat2, lng2):
     R = 6371.0
     dlat = math.radians(lat2 - lat1)
@@ -97,7 +127,8 @@ async def startup():
     async with pool.acquire() as conn:
         for cat, (table, geom_col, name_col) in TABLE_MAP.items():
             # Простейший запрос без всяких условий, всё отфильтруем в Python
-            query = f'SELECT "{name_col}" AS name, "{geom_col}"::text AS wkt FROM {table}'
+            rank_select = ', "rating_position" AS rank' if cat == "school" else ""
+            query = f'SELECT "{name_col}" AS name, "{geom_col}"::text AS wkt{rank_select} FROM {table}'
             rows = await conn.fetch(query)
             for row in rows:
                 wkt = row["wkt"]
@@ -114,7 +145,8 @@ async def startup():
                         "type": cat,
                         "name": row["name"],
                         "lat": lat,
-                        "lng": lng
+                        "lng": lng,
+                        "rank": row["rank"] if cat == "school" else None,
                     })
                 except Exception:
                     continue
@@ -135,6 +167,8 @@ async def get_comfort(req: ComfortRequest):
             if dist <= req.radius:
                 obj_copy = obj.copy()
                 obj_copy["distance"] = dist
+                if obj_copy["type"] == "school":
+                    obj_copy["schoolScore"] = school_score(obj_copy)
                 objects_in_radius.append(obj_copy)
 
         # Группировка и расчёт комфорта
@@ -149,8 +183,11 @@ async def get_comfort(req: ComfortRequest):
             alpha = params["alpha"]
             beta = params["beta"]
             weight = params["weight"]
-            raw = sum(distance_decay(o["distance"], alpha) for o in objects_by_cat[cat])
-            score = saturation(raw, beta)
+            if cat == "school":
+                score = max((school_score(o) for o in objects_by_cat[cat]), default=0.0)
+            else:
+                raw = sum(distance_decay(o["distance"], alpha) for o in objects_by_cat[cat])
+                score = saturation(raw, beta)
             category_scores[cat] = score
             total_comfort += weight * score
 
