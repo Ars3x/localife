@@ -47,7 +47,7 @@ TABLE_MAP = {
     "dent_child_clinic":("detskaya_stomatologia", "wkt_string", "ShortName"),
     "mcd":              ("mtsd",            "wkt_string",   "StationName"),
     "railway":          ("railway_station", "wkt_string",   "Name"),
-    "new_building":     ("new_building_2",  "wkt_correct",  "address"),
+    "new_building":     ("new_buildings_n",  "coordinates",  "address"),
     "dom_culturi":      ("dom_culturi",  "wkt_string",  "CommonName"), 
     "metro":            ("metro", "wkt_string", "NameOfStation"),
     "adult_polyclinic": ("vzroslaya_polyclinic", "wkt_string", "ShortName"),
@@ -194,16 +194,17 @@ async def get_comfort(req: ComfortRequest):
         max_possible = sum(p["weight"] for p in CATEGORY_PARAMS.values())
         percentage = min(100.0, round(total_comfort / max_possible * 100))
         
-        try:
-            ndvi_value = await asyncio.to_thread(
-                get_location_score,
-                req.lat, req.lng,
-                buffer_m=500,
-                max_cloud_pct=60.0
-            )
-        except Exception as e:
-            ndvi_value = None
-            print(f"Ошибка получения NDVI: {e}")
+        # try:
+        #     ndvi_value = await asyncio.to_thread(
+        #         get_location_score,
+        #         req.lat, req.lng,
+        #         buffer_m=500,
+        #         max_cloud_pct=60.0
+        #     )
+        # except Exception as e:
+        #     ndvi_value = None
+        #     print(f"Ошибка получения NDVI: {e}")
+        ndvi_value = None
 
         return ComfortResponse(
             objects=objects_in_radius,
