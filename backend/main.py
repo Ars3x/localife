@@ -24,19 +24,22 @@ cached_objects: List[Dict[str, Any]] = []
 
 # Параметры модели
 CATEGORY_PARAMS = {
-    "school":           {"alpha": 1.0, "beta": 2.0, "weight": 10},
+    "school":           {"alpha": 1.2, "beta": 2.0, "weight": 20},
     # "clinic":           {"alpha": 1.0, "beta": 1.5, "weight": 7},
     # "transport_stop":   {"alpha": 1.0, "beta": 1.5, "weight": 3},
-    "child_clinic":     {"alpha": 1.0, "beta": 2.0, "weight": 10},
+    "child_clinic":     {"alpha": 1.0, "beta": 2.5, "weight": 15},
     "dent_child_clinic":{"alpha": 1.0, "beta": 2.0, "weight": 10},
-    "mcd":              {"alpha": 1.0, "beta": 1.5, "weight": 8},
-    "railway":          {"alpha": 0.8, "beta": 1.0, "weight": 4},
+    "mcd":              {"alpha": 1.0, "beta": 1.5, "weight": 10},
+    "railway":          {"alpha": -0.7,"beta": 1.0, "weight": 8},
     "new_building":     {"alpha": 0.5, "beta": 0.5, "weight": 1},
-    "dom_culturi":      {"alpha": 0.5, "beta": 0.5, "weight": 1},
-    "metro":            {"alpha": 1.0, "beta": 2.0, "weight": 10},
-    "adult_polyclinic": {"alpha": 1.0, "beta": 2.0, "weight": 8},
-    "adult_dent":       {"alpha": 1.0, "beta": 2.0, "weight": 8},
-    "theatre":          {"alpha": 0.5, "beta": 0.5, "weight": 1}
+    "dom_culturi":      {"alpha": 0.8, "beta": 1.5, "weight": 3},
+    "metro":            {"alpha": 1.0, "beta": 2.0, "weight": 15},
+    "adult_polyclinic": {"alpha": 0.7, "beta": 1.5, "weight": 10},
+    "adult_dent":       {"alpha": 0.7, "beta": 1.5, "weight": 8},
+    "theatre":          {"alpha": 0.4, "beta": 0.5, "weight": 5},
+    "kindergarden":     {"alpha": 1.5, "beta": 2.0, "weight": 15},
+    "obschepit":        {"alpha": 1.0, "beta": 1.0, "weight": 3},
+    "technopark":       {"alpha": 1.0, "beta": 1.0, "weight": 1}
 }
 
 TABLE_MAP = {
@@ -52,7 +55,10 @@ TABLE_MAP = {
     "metro":            ("metro", "wkt_string", "NameOfStation"),
     "adult_polyclinic": ("vzroslaya_polyclinic", "wkt_string", "ShortName"),
     "adult_dent":       ("vzroslaya_stomatologia", "wkt_string", "ShortName"),
-    "theatre":          ("theatre", "wkt_string", "CommonName")
+    "theatre":          ("theatre", "wkt_string", "CommonName"),
+    "kindergarden":     ("kindergardens_points", "location", "shortname"),
+    "obschepit":        ("obschepit_filt", "location", "name"),
+    "technopark":       ("technopark", "wkt_string", "Name")
 }
 
 def distance_decay(d, alpha): return math.exp(-alpha * d)

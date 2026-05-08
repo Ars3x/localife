@@ -492,7 +492,10 @@
                 metro: { alpha: 1.0, beta: 2.0 },
                 adult_polyclinic: { alpha: 1.0, beta: 2.0 },
                 adult_dent: { alpha: 1.0, beta: 2.0 },
-                theatre: { alpha: 0.5, beta: 0.5 }
+                theatre: { alpha: 0.5, beta: 0.5 },
+                kindergarden: { alpha: 1.5, beta: 2.0 },
+                obschepit: { alpha: 1.0, beta: 1.0 },
+                technopark: { alpha: 1.0, beta: 1.0 }
             };
             //https://symbl.cc/ru/emoji/
             const categoryNames = {
@@ -508,8 +511,10 @@
                 metro: '🚇 Метро',
                 adult_polyclinic: '🏥 Взрослые поликлиники',
                 adult_dent: '🦷 Взрослые стоматологии',
-                theatre: '🎭 Театры'
-
+                theatre: '🎭 Театры',
+                kindergarden: '👦 Детские сады',
+                obschepit: '🍔 Кафе',
+                technopark: '🤖 Технопарки'
             };
 
             const categoryColors = {
@@ -524,8 +529,11 @@
                 dom_culturi: '#697d79',
                 metro: '#edb48c',
                 adult_polyclinic: '#abad9a',
-                adult_dent: '#f0faf7',
-                theatre: '#edb4e7'
+                adult_dent: '#02f5f5',
+                theatre: '#edb4e7',
+                kindergarden: '#02f563',
+                obschepit: '#f50217',
+                technopark: '#751b5f'
             };
 
             // Радиус
@@ -708,7 +716,7 @@
                     buildings.forEach(obj => {
                         const marker = L.circleMarker([obj.lat, obj.lng], {
                             radius: 5,
-                            fillColor: categoryColors.new_building,   // оранжевый, чтобы отличались
+                            fillColor: categoryColors.new_building,
                             color: '#fff',
                             weight: 2,
                             opacity: 1,
