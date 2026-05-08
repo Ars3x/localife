@@ -132,28 +132,33 @@ async def startup():
     )
     async with pool.acquire() as conn:
         for cat, (table, geom_col, name_col) in TABLE_MAP.items():
-            # Простейший запрос без всяких условий, всё отфильтруем в Python
             rank_select = ', "rating_position" AS rank' if cat == "school" else ""
-            query = f'SELECT "{name_col}" AS name, "{geom_col}"::text AS wkt{rank_select} FROM {table}'
+            ndvi_select = ', "ndvi"::float AS ndvi' if cat == "new_building" else ""
+            query = f'SELECT "{name_col}" AS name, "{geom_col}"::text AS wkt{rank_select}{ndvi_select} FROM {table}'
             rows = await conn.fetch(query)
             for row in rows:
                 wkt = row["wkt"]
                 if not wkt or not wkt.startswith("POINT("):
                     continue
                 try:
-                    # Парсим "POINT(lng lat)"
                     coords = wkt[6:-1].strip().split()
                     if len(coords) != 2:
                         continue
                     lng = float(coords[0])
                     lat = float(coords[1])
-                    cached_objects.append({
+                    obj = {
                         "type": cat,
                         "name": row["name"],
                         "lat": lat,
                         "lng": lng,
                         "rank": row["rank"] if cat == "school" else None,
-                    })
+                    }
+                    if cat == "new_building":
+                        try:
+                            obj["ndvi"] = float(row["ndvi"]) if row["ndvi"] is not None else None
+                        except (ValueError, TypeError):
+                            obj["ndvi"] = None
+                    cached_objects.append(obj)
                 except Exception:
                     continue
     await pool.close()

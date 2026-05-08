@@ -379,6 +379,10 @@
             background: #f8fafc;
             border-color: #4f46e5;
         }
+
+        .leaflet-tooltip.ndvi-tooltip {
+            white-space: pre-line;
+        }
     </style>
 </head>
 
@@ -721,7 +725,16 @@
                             weight: 2,
                             opacity: 1,
                             fillOpacity: 0.9
-                        }).bindTooltip(obj.name, { permanent: false, direction: 'top' });
+                        })
+                        let tooltipText = obj.name;
+                        if (obj.ndvi != null) {
+                            tooltipText += '\n🌿 Индекс растительности: ' + obj.ndvi.toFixed(2);
+                        }
+                        marker.bindTooltip(tooltipText, {
+                            permanent: false,
+                            direction: 'top',
+                            className: 'ndvi-tooltip'
+                        });
                         marker.addTo(allBuildingsLayer);
                     });
                     console.log(`Загружено ${buildings.length} жилых комплексов`);
