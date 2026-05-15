@@ -22,6 +22,7 @@ app.add_middleware(
 # Глобальный кэш объектов
 cached_objects: List[Dict[str, Any]] = []
 
+
 # Параметры модели
 CATEGORY_PARAMS = {
     "school":           {"alpha": 1.2, "beta": 2.0, "weight": 20},
@@ -42,6 +43,57 @@ CATEGORY_PARAMS = {
     "technopark":       {"alpha": 1.0, "beta": 1.0, "weight": 1}
 }
 
+
+SCENARIO_WEIGHTS = {
+    "family": {
+        "school":           12,
+        "child_clinic":     12,
+        "dent_child_clinic":8,
+        "mcd":              8,
+        "railway":          4,
+        "new_building":     1,
+        "dom_culturi":      2,
+        "metro":            10,
+        "adult_polyclinic": 5,
+        "adult_dent":       5,
+        "theatre":          2,
+        "kindergarden":     12,
+        "obschepit":        1,
+        "technopark":       1
+    },
+    "it": {
+        "school":           5,
+        "child_clinic":     3,
+        "dent_child_clinic":3,
+        "mcd":              10,
+        "railway":          6,
+        "new_building":     3,
+        "dom_culturi":      2,
+        "metro":            15,
+        "adult_polyclinic": 5,
+        "adult_dent":       5,
+        "theatre":          2,
+        "kindergarden":     1,
+        "obschepit":        7,
+        "technopark":       10
+    },
+    "senior": {
+        "school":           2,
+        "child_clinic":     1,
+        "dent_child_clinic":1,
+        "mcd":              5,
+        "railway":          3,
+        "new_building":     1,
+        "dom_culturi":      5,
+        "metro":            7,
+        "adult_polyclinic": 15,
+        "adult_dent":       12,
+        "theatre":          3,
+        "kindergarden":     1,
+        "obschepit":        1,
+        "technopark":       1
+    }
+}
 TABLE_MAP = {
     "school":           ("schools",         "location",     "school_name"),
     # "clinic":           ("policlinics_v",   "location",     "fullname"),
@@ -193,7 +245,7 @@ async def get_comfort(req: ComfortRequest):
         for cat, params in CATEGORY_PARAMS.items():
             alpha = params["alpha"]
             beta = params["beta"]
-            weight = params["weight"]
+            weight = SCENARIO_WEIGHTS.get(req.scenario, {}).get(cat, params["weight"])
             if cat == "school":
                 score = max((school_score(o) for o in objects_by_cat[cat]), default=0.0)
             else:
@@ -202,7 +254,10 @@ async def get_comfort(req: ComfortRequest):
             category_scores[cat] = score
             total_comfort += weight * score
 
-        max_possible = sum(p["weight"] for p in CATEGORY_PARAMS.values())
+        max_possible = sum(
+            SCENARIO_WEIGHTS.get(req.scenario, {}).get(cat, params["weight"]) 
+            for cat, params in CATEGORY_PARAMS.items()
+        )
         percentage = min(100.0, round(total_comfort / max_possible * 100))
         
         # try:
