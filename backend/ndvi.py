@@ -141,6 +141,6 @@ def init_ee(project: str | None = None, key_path: str | None = None) -> None:
 # Точка входа при запуске файла как скрипта: python NDVI.py (не выполняется при import).
 if __name__ == "__main__":
     init_ee() # Подключаемся к EE с учётом .env и SSL.
-    lat, lon = 58.693560, 56.064610 # 2. Координаты объекта недвижимости
+    lat, lon = 55.551865, 37.476936 # 2. Координаты объекта недвижимости
     score = get_location_score(lat, lon) # Вызываем функцию вычисления NDVI
     print(f"зеленый индекс района: {score:.3f}")
